@@ -1,0 +1,61 @@
+# GitHub Actions workflow for scraping Japanese property listings
+name: Scrape Japanese Property Listings
+
+on:
+  schedule:
+    # Run twice daily at 2:00 and 14:00 UTC
+    - cron: '0 2,14 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  scrape-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scrapers/requirements.txt
+      
+      - name: Install Playwright browsers
+        run: |
+          pip install playwright
+          python -m playwright install chromium
+      
+      - name: Run scrapers and upload to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd scrapers
+          python scrape_to_supabase.py --max-pages 2 --max-listings 20 --update-mode --detail-pages --enforce-image-quality
+      
+      - name: Run additional locations (Tokyo buy properties)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd scrapers
+          python scrape_to_supabase.py --location tokyo --property-type buy --max-pages 2 --max-listings 20 --update-mode --detail-pages --enforce-image-quality
+      
+      - name: Run additional locations (Osaka)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd scrapers
+          python scrape_to_supabase.py --location osaka --property-type rent --max-pages 2 --max-listings 20 --update-mode --detail-pages --enforce-image-quality
+          python scrape_to_supabase.py --location osaka --property-type buy --max-pages 2 --max-listings 20 --update-mode --detail-pages --enforce-image-quality
